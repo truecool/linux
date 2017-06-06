@@ -978,7 +978,7 @@ static int adxcvr_clk_register(struct device *dev, struct device_node *node,
 	st->out_clk_hw.init = &init;
 
 	/* register the clock */
-	clk = clk_register(dev, &st->out_clk_hw);
+	clk = devm_clk_register(dev, &st->out_clk_hw);
 	st->out_clk = clk;
 
 	return PTR_ERR_OR_ZERO(clk);
@@ -1026,12 +1026,6 @@ static void adxcvr_disable_unprepare_clocks(struct adxcvr_state *st)
 {
 	if (!IS_ERR(st->conv_clk))
 		clk_disable_unprepare(st->conv_clk);
-}
-
-static void adxcvr_unregister_clock(struct adxcvr_state *st)
-{
-	if (!IS_ERR(st->out_clk))
-		clk_unregister(st->out_clk);
 }
 
 static void adxcvr_unregister_clock_provider(struct platform_device *pdev)
@@ -1082,7 +1076,7 @@ static int adxcvr_probe(struct platform_device *pdev)
 
 	ret = adxcvr_clk_register(&pdev->dev, np, __clk_get_name(st->conv_clk));
 	if (ret)
-		goto unregister_clock;
+		return ret;
 
 	if (!IS_ERR(st->out_clk))
 		of_clk_add_provider(np, of_clk_src_simple_get,
@@ -1095,9 +1089,6 @@ static int adxcvr_probe(struct platform_device *pdev)
 		(unsigned long long)mem->start, st->regs);
 
 	return 0;
-
-unregister_clock:
-	adxcvr_unregister_clock(st);
 
 disable_unprepare:
 	adxcvr_disable_unprepare_clocks(st);
@@ -1118,7 +1109,6 @@ static int adxcvr_remove(struct platform_device *pdev)
 	struct adxcvr_state *st = platform_get_drvdata(pdev);
 
 	adxcvr_unregister_clock_provider(pdev);
-	adxcvr_unregister_clock(st);
 	adxcvr_disable_unprepare_clocks(st);
 
 	return 0;
