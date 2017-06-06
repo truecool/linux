@@ -954,9 +954,8 @@ static const struct clk_ops clkout_ops = {
 
 };
 
-static struct clk *adxcvr_clk_register(struct device *dev,
-									   struct device_node *node,
-									   const char *parent_name)
+static int adxcvr_clk_register(struct device *dev, struct device_node *node,
+	const char *parent_name)
 {
 	struct adxcvr_state *st = dev_get_drvdata(dev);
 	struct clk_init_data init;
@@ -967,7 +966,7 @@ static struct clk *adxcvr_clk_register(struct device *dev,
 	ret = of_property_read_string_index(node, "clock-output-names",
 		0, &clk_name);
 	if (ret < 0)
-		return ERR_PTR(ret);
+		return ret;
 
 	init.name = clk_name;
 	init.ops = &clkout_ops;
@@ -982,7 +981,7 @@ static struct clk *adxcvr_clk_register(struct device *dev,
 	clk = clk_register(dev, &st->out_clk_hw);
 	st->out_clk = clk;
 
-	return clk;
+	return PTR_ERR_OR_ZERO(clk);
 }
 
 static int adxcvr_parse_dt(struct adxcvr_state *st,
@@ -1053,7 +1052,6 @@ static int adxcvr_probe(struct platform_device *pdev)
 	struct adxcvr_state *st;
 	struct resource *mem; /* IO mem resources */
 	unsigned int version;
-	struct clk *clk;
 	int ret;
 
 	st = devm_kzalloc(&pdev->dev, sizeof(*st), GFP_KERNEL);
@@ -1082,11 +1080,9 @@ static int adxcvr_probe(struct platform_device *pdev)
 				  ADXCVR_SYSCLK_SEL(st->sys_clk_sel) |
 				  ADXCVR_OUTCLK_SEL(st->out_clk_sel)));
 
-	clk = adxcvr_clk_register(&pdev->dev, np, __clk_get_name(st->conv_clk));
-	if (IS_ERR(clk)) {
-		ret = PTR_ERR(clk);
+	ret = adxcvr_clk_register(&pdev->dev, np, __clk_get_name(st->conv_clk));
+	if (ret)
 		goto unregister_clock;
-	}
 
 	if (!IS_ERR(st->out_clk))
 		of_clk_add_provider(np, of_clk_src_simple_get,
