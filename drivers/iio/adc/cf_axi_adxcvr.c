@@ -987,22 +987,6 @@ static int adxcvr_clk_register(struct device *dev, struct device_node *node,
 static int adxcvr_parse_dt(struct adxcvr_state *st,
 						   struct device_node *np)
 {
-	int ret;
-
-	st->conv_clk = of_clk_get_by_name(np, "conv");
-	if (IS_ERR(st->conv_clk))
-		return PTR_ERR(st->conv_clk);
-
-	st->lane_rate_div40_clk = of_clk_get_by_name(np, "div40");
-	if (IS_ERR(st->lane_rate_div40_clk)) {
-		if (PTR_ERR(st->lane_rate_div40_clk) != -ENOENT)
-			return PTR_ERR(st->lane_rate_div40_clk);
-	}
-
-	ret = clk_prepare_enable(st->conv_clk);
-	if (ret < 0)
-		return ret;
-
 	st->gth_enable =
 		of_property_read_bool(np, "adi,transceiver-gth-enable");
 	st->tx_enable =
@@ -1044,6 +1028,20 @@ static int adxcvr_probe(struct platform_device *pdev)
 	st = devm_kzalloc(&pdev->dev, sizeof(*st), GFP_KERNEL);
 	if (!st)
 		return -ENOMEM;
+
+	st->conv_clk = devm_clk_get(&pdev->dev, "conv");
+	if (IS_ERR(st->conv_clk))
+		return PTR_ERR(st->conv_clk);
+
+	st->lane_rate_div40_clk = devm_clk_get(&pdev->dev, "div40");
+	if (IS_ERR(st->lane_rate_div40_clk)) {
+		if (PTR_ERR(st->lane_rate_div40_clk) != -ENOENT)
+			return PTR_ERR(st->lane_rate_div40_clk);
+	}
+
+	ret = clk_prepare_enable(st->conv_clk);
+	if (ret < 0)
+		return ret;
 
 	ret = adxcvr_parse_dt(st, np);
 	if (ret < 0)
